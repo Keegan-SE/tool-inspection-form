@@ -58,6 +58,7 @@
     </div>
 
     <script>
+        // Auto-fill today's date
         document.getElementById('inspectionDate').value = new Date().toISOString().split('T')[0];
 
         const toolLists = {
@@ -180,13 +181,13 @@
                 tools: tools
             };
 
-            emailjs.send("service_hcolg8r", "template_ss2ipb1", params)
+            emailjs.send("service_hcolg8r", "template_gjz0o6c", params)
                 .then(() => {
                     alert(`Success! Inspection report sent to your inbox.\n\nTechnician: ${tech}\nKit: ${kit}\nTools checked: ${tools.length}`);
                 })
                 .catch(err => {
                     console.error("EmailJS error:", err);
-                    alert("Failed to send report. Check internet connection or open console (Develop > Show JavaScript Console) for details.");
+                    alert("Failed to send report. Check internet or console (Develop > Show JavaScript Console) for details.");
                 });
         });
     </script>
