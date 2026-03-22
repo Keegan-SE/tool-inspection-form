@@ -20,11 +20,11 @@
         <h1 class="text-center mb-4">🔧 Tool Kit Inspection</h1>
         <p class="text-center text-muted mb-4">Select your kit, check present tools, enter serial (starts with EBCJV) + cycles where needed.</p>
 
-        <form id="inspectionForm">
+        <form id="inspectionForm" novalidate>
             <div class="row mb-4">
                 <div class="col-md-6">
                     <label class="form-label fw-bold">Technician Name <span class="text-danger">*</span></label>
-                    <input type="text" class="form-control" id="techName" required placeholder="Your full name">
+                    <input type="text" class="form-control" id="techName" placeholder="Your full name">
                 </div>
                 <div class="col-md-6">
                     <label class="form-label fw-bold">Inspection Date</label>
@@ -34,7 +34,7 @@
 
             <div class="mb-4">
                 <label class="form-label fw-bold">Kit Type <span class="text-danger">*</span></label>
-                <select class="form-select" id="kitType" required>
+                <select class="form-select" id="kitType">
                     <option value="">-- Select Kit --</option>
                     <option value="A Nacelle">Kit A Nacelle Tools</option>
                     <option value="A Tower">Kit A Tower Tools</option>
@@ -58,10 +58,9 @@
     </div>
 
     <script>
-        // Today's date
+        // Set today's date
         document.getElementById('inspectionDate').value = new Date().toISOString().split('T')[0];
 
-        // Tool lists
         const toolLists = {
             "A Nacelle": [
                 { code: "A9B10409967", name: "ITH PUMP 400V" },
@@ -87,11 +86,10 @@
                 { code: "A9B10409965", name: "M72 Bottom" },
                 { code: "A9B10451311", name: "M72 Top" }
             ],
-            "B Nacelle": [],  // Fill if different from A Nacelle
-            "B Tower": []     // Fill if different from A Tower
+            "B Nacelle": [],
+            "B Tower": []
         };
 
-        // Use same lists for B kits unless you provide differences
         toolLists["B Nacelle"] = toolLists["A Nacelle"];
         toolLists["B Tower"] = toolLists["A Tower"];
 
@@ -122,12 +120,12 @@
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <label class="form-label">Serial Number <span class="text-danger">*</span> (starts with EBCJV)</label>
-                                <input type="text" class="form-control serial-input" placeholder="EBCJV123456" required>
+                                <input type="text" class="form-control serial-input" placeholder="EBCJV123456">
                             </div>
                             ${isTension ? `
                             <div class="col-md-6">
                                 <label class="form-label">Cycles Left <span class="text-danger">*</span></label>
-                                <input type="number" class="form-control cycles-input" min="0" placeholder="e.g. 450" required>
+                                <input type="number" class="form-control cycles-input" min="0" placeholder="e.g. 450">
                             </div>` : ''}
                         </div>
                     </div>
@@ -139,64 +137,76 @@
                 const details = div.querySelector('.tool-details');
                 checkbox.addEventListener('change', () => {
                     details.classList.toggle('show', checkbox.checked);
-                    const inputs = details.querySelectorAll('input');
-                    inputs.forEach(inp => inp.required = checkbox.checked);
                 });
             });
         });
 
-        // EmailJS initialization with your public key
         (function() {
             emailjs.init({ publicKey: "XO8aikuA7tN7m9laW" });
         })();
 
-        // Submit handler with your service and template IDs
         document.getElementById('inspectionForm').addEventListener('submit', function(e) {
             e.preventDefault();
 
+            console.log("DEBUG: Submit handler STARTED");
+            alert("DEBUG: Submit handler is running!");
+
             const kit = kitSelect.options[kitSelect.selectedIndex].text;
+            console.log("DEBUG: Selected kit:", kit);
+
             const tech = document.getElementById('techName').value.trim();
-            const date = document.getElementById('inspectionDate').value;
+            console.log("DEBUG: Technician name:", tech);
+
             const notes = document.getElementById('notes').value.trim();
+            console.log("DEBUG: Notes:", notes);
 
             const tools = [];
             document.querySelectorAll('.tool-check:checked').forEach(check => {
                 const code = check.value;
                 const name = check.dataset.name;
                 const row = check.closest('.tool-item');
-                const serial = row.querySelector('.serial-input')?.value.trim() || '';
-                const cyclesEl = row.querySelector('.cycles-input');
-                const cycles = cyclesEl ? parseInt(cyclesEl.value) || null : null;
+                const serialInput = row.querySelector('.serial-input');
+                const cyclesInput = row.querySelector('.cycles-input');
+
+                const serial = serialInput ? serialInput.value.trim() : '';
+                const cycles = cyclesInput ? parseInt(cyclesInput.value) || null : null;
+
+                console.log("DEBUG: Checked tool:", { code, name, serial, cycles });
 
                 if (serial) {
                     tools.push({ code, name, serial, cycles });
                 }
             });
 
+            console.log("DEBUG: Collected tools count:", tools.length);
+
             if (tools.length === 0) {
-                alert("Please check at least one tool.");
+                alert("Please check at least one tool and enter its serial number.");
+                console.log("DEBUG: No tools checked - stopped");
                 return;
             }
 
+            console.log("DEBUG: Preparing to send to EmailJS");
+
             const params = {
                 technician: tech,
-                date: date,
+                date: document.getElementById('inspectionDate').value,
                 kit: kit,
                 notes: notes || "None",
                 timestamp: new Date().toISOString(),
                 tools: tools
             };
 
+            console.log("DEBUG: Params ready:", params);
+
             emailjs.send("service_hcolg8r", "template_ss2ipb1", params)
                 .then(() => {
-                    alert(`Success! Report sent to Keegan.\nTechnician: ${tech}\nKit: ${kit}\nTools: ${tools.length}`);
-                    // Optional: reset form after success
-                    // this.reset();
-                    // container.innerHTML = '';
+                    console.log("DEBUG: EmailJS send SUCCESS");
+                    alert(`Success! Inspection report sent to your inbox.\n\nTechnician: ${tech}\nKit: ${kit}\nTools checked: ${tools.length}`);
                 })
                 .catch(err => {
-                    console.error("EmailJS error:", err);
-                    alert("Send failed — check connection or open F12 console for details.");
+                    console.error("DEBUG: EmailJS send FAILED:", err);
+                    alert("Failed to send report. Check internet or open F12 console for details.");
                 });
         });
     </script>
