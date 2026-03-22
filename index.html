@@ -4,194 +4,198 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tool Kit Inspection Form</title>
+
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+
     <style>
         body { background-color: #f8f9fa; padding: 30px 15px; }
-        .form-container { max-width: 950px; margin: auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
-        h1 { color: #0d6efd; }
-        .tool-item { border: 1px solid #dee2e6; border-radius: 8px; padding: 15px; margin-bottom: 12px; background: #fff; }
-        .tool-details { display: none; margin-top: 10px; padding-top: 10px; border-top: 1px solid #eee; }
+        .form-container {
+            max-width: 950px;
+            margin: auto;
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+        .tool-item {
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 12px;
+        }
+        .tool-details { display: none; margin-top: 10px; }
         .tool-details.show { display: block; }
     </style>
 </head>
+
 <body>
-    <div class="form-container">
-        <h1 class="text-center mb-4">🔧 Tool Kit Inspection</h1>
-        <p class="text-center text-muted mb-4">Select your kit, check present tools, enter serial (starts with EBCJV) + cycles where needed.</p>
+<div class="form-container">
 
-        <form id="inspectionForm" novalidate>
-            <div class="row mb-4">
-                <div class="col-md-6">
-                    <label class="form-label fw-bold">Technician Name <span class="text-danger">*</span></label>
-                    <input type="text" class="form-control" id="techName" placeholder="Your full name">
-                </div>
-                <div class="col-md-6">
-                    <label class="form-label fw-bold">Inspection Date</label>
-                    <input type="date" class="form-control" id="inspectionDate" readonly>
-                </div>
+    <h1 class="text-center mb-4">🔧 Tool Kit Inspection</h1>
+
+    <form id="inspectionForm">
+
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <label class="form-label fw-bold">Technician Name *</label>
+                <input type="text" class="form-control" id="techName">
+            </div>
+            <div class="col-md-6">
+                <label class="form-label fw-bold">Inspection Date</label>
+                <input type="date" class="form-control" id="inspectionDate" readonly>
+            </div>
+        </div>
+
+        <div class="mb-4">
+            <label class="form-label fw-bold">Kit Type *</label>
+            <select class="form-select" id="kitType">
+                <option value="">-- Select Kit --</option>
+                <option value="A Nacelle">Kit A Nacelle</option>
+                <option value="A Tower">Kit A Tower</option>
+                <option value="B Nacelle">Kit B Nacelle</option>
+                <option value="B Tower">Kit B Tower</option>
+            </select>
+        </div>
+
+        <h5>Tools Checklist</h5>
+        <div id="toolsContainer"></div>
+
+        <div class="mb-4">
+            <label class="form-label fw-bold">Notes</label>
+            <textarea class="form-control" id="notes"></textarea>
+        </div>
+
+        <button class="btn btn-primary w-100">Submit & Email</button>
+
+    </form>
+</div>
+
+<script>
+document.getElementById('inspectionDate').value =
+    new Date().toISOString().split('T')[0];
+
+const toolLists = {
+    "A Nacelle": [
+        { code: "A9B10409967", name: "ITH PUMP 400V" },
+        { code: "A9B10417874", name: "HYDRAULIC HOSE 20M" },
+        { code: "A9BB0025812", name: "M42 Bottom" }
+    ],
+    "A Tower": [
+        { code: "M48Bottom", name: "M48 Bottom" },
+        { code: "M56Top", name: "M56 Top" }
+    ],
+    "B Nacelle": [],
+    "B Tower": []
+};
+
+toolLists["B Nacelle"] = toolLists["A Nacelle"];
+toolLists["B Tower"] = toolLists["A Tower"];
+
+const kitSelect = document.getElementById('kitType');
+const container = document.getElementById('toolsContainer');
+
+kitSelect.addEventListener('change', () => {
+    container.innerHTML = '';
+    const list = toolLists[kitSelect.value];
+    if (!list) return;
+
+    list.forEach(tool => {
+        const isTension = tool.name.includes("M");
+
+        const div = document.createElement('div');
+        div.className = 'tool-item';
+
+        div.innerHTML = `
+            <div class="form-check">
+                <input type="checkbox" class="form-check-input tool-check" 
+                    value="${tool.code}" data-name="${tool.name}">
+                <label class="form-check-label">
+                    ${tool.code} – ${tool.name}
+                </label>
             </div>
 
-            <div class="mb-4">
-                <label class="form-label fw-bold">Kit Type <span class="text-danger">*</span></label>
-                <select class="form-select" id="kitType">
-                    <option value="">-- Select Kit --</option>
-                    <option value="A Nacelle">Kit A Nacelle Tools</option>
-                    <option value="A Tower">Kit A Tower Tools</option>
-                    <option value="B Nacelle">Kit B Nacelle Tools</option>
-                    <option value="B Tower">Kit B Tower Tools</option>
-                </select>
+            <div class="tool-details">
+                <input class="form-control serial-input mt-2" placeholder="Serial (EBCJV...)">
+                ${isTension ? `<input class="form-control cycles-input mt-2" placeholder="Cycles">` : ''}
             </div>
+        `;
 
-            <h5 class="mt-5 mb-3">Tools Checklist</h5>
-            <p class="text-muted small mb-4">Check each tool present. Serial required for all; cycles only for M42/M48/M56/M64/M72.</p>
+        container.appendChild(div);
 
-            <div id="toolsContainer" class="mb-4"></div>
+        const check = div.querySelector('.tool-check');
+        const details = div.querySelector('.tool-details');
 
-            <div class="mb-4">
-                <label class="form-label fw-bold">Notes / Issues / Missing Tools</label>
-                <textarea class="form-control" id="notes" rows="3" placeholder="Any damage, missing items, or comments..."></textarea>
-            </div>
-
-            <button type="submit" class="btn btn-primary btn-lg w-100">Submit & Email Report</button>
-        </form>
-    </div>
-
-    <script>
-        // Auto-fill today's date
-        document.getElementById('inspectionDate').value = new Date().toISOString().split('T')[0];
-
-        const toolLists = {
-            "A Nacelle": [
-                { code: "A9B10409967", name: "ITH PUMP 400V" },
-                { code: "ITHGauge", name: "ITH Pressure Gauge" },
-                { code: "A9B10417874", name: "HYDRAULIC HOSE 20M" },
-                { code: "A9BB0025812", name: "M42 Bottom" },
-                { code: "A9B10364804", name: "M42 Top" },
-                { code: "A9B10041792", name: "Plarad Hose Set 10m" },
-                { code: "A9B10042397", name: "Plarad Mxec95Ts" },
-                { code: "A9B10271779", name: "Plarad Hyde Pump" },
-                { code: "A9B00081024", name: "Plarad Pressure Gauge" }
-            ],
-            "A Tower": [
-                { code: "A9B10409967", name: "ITH PUMP" },
-                { code: "A9B10417874", name: "HYDRAULIC HOSE 20M" },
-                { code: "ITHGauge", name: "ITH Pressure Gauge" },
-                { code: "M48Bottom", name: "M48 Bottom" },
-                { code: "M48Top", name: "M48 Top" },
-                { code: "A9B10409963", name: "M56 Bottom" },
-                { code: "A9B10451309", name: "M56 Top" },
-                { code: "A9B10409964", name: "M64 Bottom" },
-                { code: "A9B10409283", name: "M64 Top" },
-                { code: "A9B10409965", name: "M72 Bottom" },
-                { code: "A9B10451311", name: "M72 Top" }
-            ],
-            "B Nacelle": [],
-            "B Tower": []
-        };
-
-        toolLists["B Nacelle"] = toolLists["A Nacelle"];
-        toolLists["B Tower"] = toolLists["A Tower"];
-
-        const kitSelect = document.getElementById('kitType');
-        const container = document.getElementById('toolsContainer');
-
-        kitSelect.addEventListener('change', () => {
-            const selected = kitSelect.value;
-            container.innerHTML = '';
-
-            if (!selected || !toolLists[selected]) return;
-
-            toolLists[selected].forEach(tool => {
-                const isTension = ["M42", "M48", "M56", "M64", "M72"].some(size => 
-                    tool.name.includes(size) || tool.code.includes(size)
-                );
-
-                const div = document.createElement('div');
-                div.className = 'tool-item';
-                div.innerHTML = `
-                    <div class="form-check">
-                        <input class="form-check-input tool-check" type="checkbox" id="check-${tool.code}" value="${tool.code}" data-name="${tool.name}" data-istension="${isTension}">
-                        <label class="form-check-label fw-bold" for="check-${tool.code}">
-                            ${tool.code} – ${tool.name}
-                        </label>
-                    </div>
-                    <div class="tool-details" id="details-${tool.code}">
-                        <div class="row g-3">
-                            <div class="col-md-6">
-                                <label class="form-label">Serial Number <span class="text-danger">*</span> (starts with EBCJV)</label>
-                                <input type="text" class="form-control serial-input" placeholder="EBCJV123456">
-                            </div>
-                            ${isTension ? `
-                            <div class="col-md-6">
-                                <label class="form-label">Cycles Left <span class="text-danger">*</span></label>
-                                <input type="number" class="form-control cycles-input" min="0" placeholder="e.g. 450">
-                            </div>` : ''}
-                        </div>
-                    </div>
-                `;
-
-                container.appendChild(div);
-
-                const checkbox = div.querySelector('.tool-check');
-                const details = div.querySelector('.tool-details');
-                checkbox.addEventListener('change', () => {
-                    details.classList.toggle('show', checkbox.checked);
-                });
-            });
+        check.addEventListener('change', () => {
+            details.classList.toggle('show', check.checked);
         });
+    });
+});
 
-        (function() {
-            emailjs.init({ publicKey: "XO8aikuA7tN7m9laW" });
-        })();
+// EmailJS init
+emailjs.init("XO8aikuA7tN7m9laW");
 
-        document.getElementById('inspectionForm').addEventListener('submit', function(e) {
-            e.preventDefault();
+document.getElementById('inspectionForm').addEventListener('submit', function(e) {
+    e.preventDefault();
 
-            const kit = kitSelect.options[kitSelect.selectedIndex].text;
-            const tech = document.getElementById('techName').value.trim();
-            const date = document.getElementById('inspectionDate').value;
-            const notes = document.getElementById('notes').value.trim();
+    const tech = document.getElementById('techName').value.trim();
+    const kit = kitSelect.value;
+    const date = document.getElementById('inspectionDate').value;
+    const notes = document.getElementById('notes').value || "None";
 
-            const tools = [];
-            document.querySelectorAll('.tool-check:checked').forEach(check => {
-                const code = check.value;
-                const name = check.dataset.name;
-                const row = check.closest('.tool-item');
-                const serial = row.querySelector('.serial-input')?.value.trim() || '';
-                const cyclesEl = row.querySelector('.cycles-input');
-                const cycles = cyclesEl ? parseInt(cyclesEl.value) || null : null;
+    if (!tech || !kit) {
+        alert("Fill required fields");
+        return;
+    }
 
-                if (serial) {
-                    tools.push({ code, name, serial, cycles });
-                }
+    const tools = [];
+
+    document.querySelectorAll('.tool-check:checked').forEach(check => {
+        const row = check.closest('.tool-item');
+
+        const serial = row.querySelector('.serial-input').value;
+        const cyclesEl = row.querySelector('.cycles-input');
+
+        const cycles = cyclesEl ? cyclesEl.value : '';
+
+        if (serial) {
+            tools.push({
+                code: check.value,
+                name: check.dataset.name,
+                serial,
+                cycles
             });
+        }
+    });
 
-            if (tools.length === 0) {
-                alert("Please check at least one tool and enter its serial number.");
-                return;
-            }
+    if (tools.length === 0) {
+        alert("Select at least one tool");
+        return;
+    }
 
-            const params = {
-                technician: tech,
-                date: date,
-                kit: kit,
-                notes: notes || "None",
-                timestamp: new Date().toISOString(),
-                tools: tools
-            };
+    // 🔥 FIX: build string manually
+    const tools_list = tools.map(t =>
+        `${t.code} – ${t.name}
+Serial: ${t.serial}${t.cycles ? " | Cycles: " + t.cycles : ""}`
+    ).join("\n\n");
 
-            emailjs.send("service_hcolg8r", "template_gjz0o6c", params)
-                .then(() => {
-                    alert(`Success! Inspection report sent to your inbox.\n\nTechnician: ${tech}\nKit: ${kit}\nTools checked: ${tools.length}`);
-                })
-                .catch(err => {
-                    console.error("EmailJS error:", err);
-                    alert("Failed to send report. Check internet or console (Develop > Show JavaScript Console) for details.");
-                });
+    const params = {
+        technician: tech,
+        date: date,
+        kit: kit,
+        notes: notes,
+        timestamp: new Date().toLocaleString(),
+        tools_list: tools_list
+    };
+
+    emailjs.send("service_hcolg8r", "template_gjz0o6c", params)
+        .then(() => alert("✅ Email sent successfully"))
+        .catch(err => {
+            console.error(err);
+            alert("❌ Failed to send email");
         });
-    </script>
+});
+</script>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
