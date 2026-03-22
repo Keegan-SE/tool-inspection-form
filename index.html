@@ -58,7 +58,6 @@
     </div>
 
     <script>
-        // Set today's date
         document.getElementById('inspectionDate').value = new Date().toISOString().split('T')[0];
 
         const toolLists = {
@@ -148,65 +147,46 @@
         document.getElementById('inspectionForm').addEventListener('submit', function(e) {
             e.preventDefault();
 
-            console.log("DEBUG: Submit handler STARTED");
-            alert("DEBUG: Submit handler is running!");
-
             const kit = kitSelect.options[kitSelect.selectedIndex].text;
-            console.log("DEBUG: Selected kit:", kit);
-
             const tech = document.getElementById('techName').value.trim();
-            console.log("DEBUG: Technician name:", tech);
-
+            const date = document.getElementById('inspectionDate').value;
             const notes = document.getElementById('notes').value.trim();
-            console.log("DEBUG: Notes:", notes);
 
             const tools = [];
             document.querySelectorAll('.tool-check:checked').forEach(check => {
                 const code = check.value;
                 const name = check.dataset.name;
                 const row = check.closest('.tool-item');
-                const serialInput = row.querySelector('.serial-input');
-                const cyclesInput = row.querySelector('.cycles-input');
-
-                const serial = serialInput ? serialInput.value.trim() : '';
-                const cycles = cyclesInput ? parseInt(cyclesInput.value) || null : null;
-
-                console.log("DEBUG: Checked tool:", { code, name, serial, cycles });
+                const serial = row.querySelector('.serial-input')?.value.trim() || '';
+                const cyclesEl = row.querySelector('.cycles-input');
+                const cycles = cyclesEl ? parseInt(cyclesEl.value) || null : null;
 
                 if (serial) {
                     tools.push({ code, name, serial, cycles });
                 }
             });
 
-            console.log("DEBUG: Collected tools count:", tools.length);
-
             if (tools.length === 0) {
                 alert("Please check at least one tool and enter its serial number.");
-                console.log("DEBUG: No tools checked - stopped");
                 return;
             }
 
-            console.log("DEBUG: Preparing to send to EmailJS");
-
             const params = {
                 technician: tech,
-                date: document.getElementById('inspectionDate').value,
+                date: date,
                 kit: kit,
                 notes: notes || "None",
                 timestamp: new Date().toISOString(),
                 tools: tools
             };
 
-            console.log("DEBUG: Params ready:", params);
-
             emailjs.send("service_hcolg8r", "template_ss2ipb1", params)
                 .then(() => {
-                    console.log("DEBUG: EmailJS send SUCCESS");
                     alert(`Success! Inspection report sent to your inbox.\n\nTechnician: ${tech}\nKit: ${kit}\nTools checked: ${tools.length}`);
                 })
                 .catch(err => {
-                    console.error("DEBUG: EmailJS send FAILED:", err);
-                    alert("Failed to send report. Check internet or open F12 console for details.");
+                    console.error("EmailJS error:", err);
+                    alert("Failed to send report. Check internet connection or open console (Develop > Show JavaScript Console) for details.");
                 });
         });
     </script>
