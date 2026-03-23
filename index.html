@@ -13,34 +13,94 @@
             background-color: #f8f9fa;
             padding: 30px 15px;
         }
+
         .form-container {
-            max-width: 950px;
+            max-width: 1000px;
             margin: auto;
             background: white;
             padding: 30px;
             border-radius: 12px;
             box-shadow: 0 4px 20px rgba(0,0,0,0.1);
         }
+
         .tool-item {
             border: 1px solid #dee2e6;
             border-radius: 8px;
             padding: 15px;
             margin-bottom: 12px;
+            background: #fff;
         }
+
         .tool-details {
             display: none;
-            margin-top: 10px;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px dashed #dee2e6;
         }
+
         .tool-details.show {
             display: block;
         }
+
+        .repeat-serial-row {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            padding: 10px;
+            margin-top: 8px;
+        }
+
         .required-note {
-            font-size: 0.9rem;
+            font-size: 0.92rem;
             color: #6c757d;
         }
+
         .error-text {
             color: #dc3545;
             font-size: 0.875rem;
+            margin-top: 8px;
+            white-space: pre-line;
+        }
+
+        .tool-code {
+            color: #6c757d;
+            font-size: 0.95rem;
+        }
+
+        .qty-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            justify-content: flex-start;
+        }
+
+        .qty-btn {
+            width: 40px;
+            height: 40px;
+            border: none;
+            border-radius: 8px;
+            background: #0d6efd;
+            color: white;
+            font-size: 22px;
+            line-height: 1;
+            cursor: pointer;
+        }
+
+        .qty-btn:disabled {
+            background: #adb5bd;
+            cursor: not-allowed;
+        }
+
+        .qty-display {
+            min-width: 40px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .max-note {
+            font-size: 0.85rem;
+            color: #6c757d;
             margin-top: 6px;
         }
     </style>
@@ -48,7 +108,6 @@
 
 <body>
 <div class="form-container">
-
     <h1 class="text-center mb-4">🔧 Tool Kit Inspection</h1>
 
     <form id="inspectionForm">
@@ -77,14 +136,16 @@
 
         <h5>Tools Checklist</h5>
         <p class="required-note mb-3">
-            Serial number must start with <strong>EBCJV</strong>.  
-            M42, M48, M56, M64 and M72 tools also require cycles.
+            Serial number must start with <strong>EBCJV</strong>.<br>
+            M42, M48, M56, M64 and M72 tools require cycles.<br>
+            Nacelle kits: ITH Pump, ITH Gauge, Hydraulic Hose max 2. M42 max 2.<br>
+            Tower kits: ITH Pump, ITH Gauge, Hydraulic Hose max 4.
         </p>
 
         <div id="toolsContainer"></div>
 
         <div class="mb-4">
-            <label class="form-label fw-bold">Notes</label>
+            <label class="form-label fw-bold">Notes / Issues</label>
             <textarea class="form-control" id="notes" rows="3"></textarea>
         </div>
 
@@ -136,59 +197,217 @@ function requiresCycles(toolName) {
     return /M42|M48|M56|M64|M72/i.test(toolName);
 }
 
-kitSelect.addEventListener('change', () => {
+function isTowerKit(kitName) {
+    return /Tower/i.test(kitName);
+}
+
+function isNacelleKit(kitName) {
+    return /Nacelle/i.test(kitName);
+}
+
+function isITHPump(toolName) {
+    return /ITH PUMP/i.test(toolName);
+}
+
+function isITHGauge(toolName) {
+    return /ITH Pressure Gauge/i.test(toolName);
+}
+
+function isHydraulicHose(toolCode, toolName) {
+    return toolCode === "A9B10417874" || /HYDRAULIC HOSE 20M/i.test(toolName);
+}
+
+function isM42(toolName) {
+    return /M42/i.test(toolName);
+}
+
+function getMaxQty(tool, kitName) {
+    if (isNacelleKit(kitName)) {
+        if (isITHPump(tool.name) || isITHGauge(tool.name) || isHydraulicHose(tool.code, tool.name)) {
+            return 2;
+        }
+        if (isM42(tool.name)) {
+            return 2;
+        }
+    }
+
+    if (isTowerKit(kitName)) {
+        if (isITHPump(tool.name) || isITHGauge(tool.name) || isHydraulicHose(tool.code, tool.name)) {
+            return 4;
+        }
+    }
+
+    return 1;
+}
+
+function makeSafeId(text) {
+    return text.replace(/[^a-zA-Z0-9_-]/g, '_');
+}
+
+function escapeHtml(text) {
+    return String(text)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+function updateQtyControls(toolItem, qty, maxQty) {
+    const minusBtn = toolItem.querySelector('.minus-btn');
+    const plusBtn = toolItem.querySelector('.plus-btn');
+    const qtyDisplay = toolItem.querySelector('.qty-display');
+    const details = toolItem.querySelector('.tool-details');
+
+    qtyDisplay.textContent = qty;
+    minusBtn.disabled = qty <= 0;
+    plusBtn.disabled = qty >= maxQty;
+    details.classList.toggle('show', qty > 0);
+}
+
+function renderRepeatableInputs(toolItem, qty, tool, needCycles) {
+    const wrapper = toolItem.querySelector('.repeatable-inputs');
+    wrapper.innerHTML = '';
+
+    for (let i = 1; i <= qty; i++) {
+        const row = document.createElement('div');
+        row.className = 'repeat-serial-row';
+        row.innerHTML = `
+            <div class="mb-2">
+                <label class="form-label fw-semibold">${tool.name} #${i} Serial Number *</label>
+                <input type="text" class="form-control repeat-serial-input" data-index="${i}" placeholder="Must start with EBCJV">
+            </div>
+            ${needCycles ? `
+                <div>
+                    <label class="form-label fw-semibold">${tool.name} #${i} Cycles *</label>
+                    <input type="number" min="0" class="form-control repeat-cycles-input" data-index="${i}" placeholder="Number of Cycles">
+                </div>
+            ` : ''}
+        `;
+        wrapper.appendChild(row);
+    }
+}
+
+function createRepeatableTool(tool, kitName) {
+    const maxQty = getMaxQty(tool, kitName);
+    const needCycles = requiresCycles(tool.name);
+    const div = document.createElement('div');
+    div.className = 'tool-item';
+    div.dataset.code = tool.code;
+    div.dataset.name = tool.name;
+    div.dataset.repeatable = 'true';
+    div.dataset.maxQty = maxQty;
+    div.dataset.cycles = needCycles ? 'true' : 'false';
+    div.dataset.qty = '0';
+
+    div.innerHTML = `
+        <div class="row align-items-center g-3">
+            <div class="col-md-7">
+                <div class="fw-semibold">${tool.name}</div>
+                <div class="tool-code">${tool.code}</div>
+            </div>
+            <div class="col-md-5">
+                <label class="form-label fw-bold">Quantity</label>
+                <div class="qty-control">
+                    <button type="button" class="qty-btn minus-btn">−</button>
+                    <div class="qty-display">0</div>
+                    <button type="button" class="qty-btn plus-btn">+</button>
+                </div>
+                <div class="max-note">Maximum: ${maxQty}</div>
+            </div>
+        </div>
+
+        <div class="tool-details">
+            <div class="repeatable-inputs"></div>
+            <div class="error-text d-none"></div>
+        </div>
+    `;
+
+    const minusBtn = div.querySelector('.minus-btn');
+    const plusBtn = div.querySelector('.plus-btn');
+
+    minusBtn.addEventListener('click', () => {
+        let qty = Number(div.dataset.qty) || 0;
+        if (qty > 0) {
+            qty--;
+            div.dataset.qty = qty;
+            updateQtyControls(div, qty, maxQty);
+            renderRepeatableInputs(div, qty, tool, needCycles);
+        }
+    });
+
+    plusBtn.addEventListener('click', () => {
+        let qty = Number(div.dataset.qty) || 0;
+        if (qty < maxQty) {
+            qty++;
+            div.dataset.qty = qty;
+            updateQtyControls(div, qty, maxQty);
+            renderRepeatableInputs(div, qty, tool, needCycles);
+        }
+    });
+
+    updateQtyControls(div, 0, maxQty);
+    return div;
+}
+
+function createSingleTool(tool, kitName) {
+    const needCycles = requiresCycles(tool.name);
+    const uniqueId = `tool_${makeSafeId(tool.code)}_${makeSafeId(tool.name)}`;
+    const div = document.createElement('div');
+    div.className = 'tool-item';
+    div.dataset.code = tool.code;
+    div.dataset.name = tool.name;
+    div.dataset.repeatable = 'false';
+    div.dataset.cycles = needCycles ? 'true' : 'false';
+
+    div.innerHTML = `
+        <div class="form-check">
+            <input
+                type="checkbox"
+                class="form-check-input tool-check"
+                id="${uniqueId}"
+                value="${tool.code}"
+                data-name="${tool.name}"
+            >
+            <label class="form-check-label fw-semibold" for="${uniqueId}">
+                ${tool.code} – ${tool.name}
+            </label>
+        </div>
+
+        <div class="tool-details">
+            <input class="form-control serial-input mt-2" placeholder="Serial Number (must start with EBCJV)">
+            ${needCycles ? `<input type="number" min="0" class="form-control cycles-input mt-2" placeholder="Number of Cycles">` : ''}
+            <div class="error-text d-none"></div>
+        </div>
+    `;
+
+    const check = div.querySelector('.tool-check');
+    const details = div.querySelector('.tool-details');
+
+    check.addEventListener('change', () => {
+        details.classList.toggle('show', check.checked);
+    });
+
+    return div;
+}
+
+function renderTools() {
     container.innerHTML = '';
-    const list = toolLists[kitSelect.value];
+    const kitName = kitSelect.value;
+    const list = toolLists[kitName];
     if (!list) return;
 
     list.forEach(tool => {
-        const needCycles = requiresCycles(tool.name);
-
-        const div = document.createElement('div');
-        div.className = 'tool-item';
-
-        div.innerHTML = `
-            <div class="form-check">
-                <input
-                    type="checkbox"
-                    class="form-check-input tool-check"
-                    id="tool_${tool.code}_${tool.name.replace(/\s+/g, '_')}"
-                    value="${tool.code}"
-                    data-name="${tool.name}"
-                    data-cycles="${needCycles}"
-                >
-                <label class="form-check-label fw-semibold" for="tool_${tool.code}_${tool.name.replace(/\s+/g, '_')}">
-                    ${tool.code} – ${tool.name}
-                </label>
-            </div>
-
-            <div class="tool-details">
-                <input
-                    class="form-control serial-input mt-2"
-                    placeholder="Serial Number (must start with EBCJV)"
-                >
-                ${needCycles ? `
-                    <input
-                        type="number"
-                        min="0"
-                        class="form-control cycles-input mt-2"
-                        placeholder="Number of Cycles"
-                    >
-                ` : ''}
-                <div class="error-text d-none"></div>
-            </div>
-        `;
-
-        container.appendChild(div);
-
-        const check = div.querySelector('.tool-check');
-        const details = div.querySelector('.tool-details');
-
-        check.addEventListener('change', () => {
-            details.classList.toggle('show', check.checked);
-        });
+        const maxQty = getMaxQty(tool, kitName);
+        if (maxQty > 1) {
+            container.appendChild(createRepeatableTool(tool, kitName));
+        } else {
+            container.appendChild(createSingleTool(tool, kitName));
+        }
     });
-});
+}
+
+kitSelect.addEventListener('change', renderTools);
 
 // EmailJS init
 emailjs.init("XO8aikuA7tN7m9laW");
@@ -206,82 +425,190 @@ document.getElementById('inspectionForm').addEventListener('submit', function(e)
         return;
     }
 
-    const checkedTools = document.querySelectorAll('.tool-check:checked');
-
-    if (checkedTools.length === 0) {
-        alert("Please select at least one tool.");
-        return;
-    }
-
     const tools = [];
     let hasError = false;
 
-    document.querySelectorAll('.tool-item').forEach(item => {
-        const errorBox = item.querySelector('.error-text');
-        if (errorBox) {
-            errorBox.classList.add('d-none');
-            errorBox.textContent = '';
-        }
+    document.querySelectorAll('.error-text').forEach(el => {
+        el.classList.add('d-none');
+        el.textContent = '';
     });
 
-    checkedTools.forEach(check => {
-        const row = check.closest('.tool-item');
-        const serialInput = row.querySelector('.serial-input');
-        const cyclesInput = row.querySelector('.cycles-input');
-        const errorBox = row.querySelector('.error-text');
+    document.querySelectorAll('.tool-item').forEach(item => {
+        const toolName = item.dataset.name;
+        const toolCode = item.dataset.code;
+        const repeatable = item.dataset.repeatable === 'true';
+        const needCycles = item.dataset.cycles === 'true';
+        const errorBox = item.querySelector('.error-text');
 
-        const serial = serialInput ? serialInput.value.trim() : '';
-        const cycles = cyclesInput ? cyclesInput.value.trim() : '';
-        const needCycles = check.dataset.cycles === "true";
+        if (repeatable) {
+            const qty = Number(item.dataset.qty) || 0;
 
-        let errors = [];
+            if (qty > 0) {
+                const serialInputs = item.querySelectorAll('.repeat-serial-input');
+                const cycleInputs = item.querySelectorAll('.repeat-cycles-input');
+                let errors = [];
 
-        if (!serial) {
-            errors.push("Serial number is required.");
-        } else if (!serial.toUpperCase().startsWith("EBCJV")) {
-            errors.push('Serial number must start with "EBCJV".');
-        }
+                for (let i = 0; i < qty; i++) {
+                    const serial = serialInputs[i] ? serialInputs[i].value.trim() : '';
+                    const cycles = needCycles && cycleInputs[i] ? cycleInputs[i].value.trim() : '';
 
-        if (needCycles) {
-            if (!cycles) {
-                errors.push("Number of cycles is required.");
-            } else if (isNaN(cycles) || Number(cycles) < 0) {
-                errors.push("Cycles must be a valid number.");
+                    if (!serial) {
+                        errors.push(`${toolName} #${i + 1}: Serial number is required.`);
+                        continue;
+                    }
+
+                    if (!serial.toUpperCase().startsWith('EBCJV')) {
+                        errors.push(`${toolName} #${i + 1}: Serial must start with EBCJV.`);
+                        continue;
+                    }
+
+                    if (needCycles) {
+                        if (!cycles) {
+                            errors.push(`${toolName} #${i + 1}: Cycles are required.`);
+                            continue;
+                        }
+
+                        if (isNaN(cycles) || Number(cycles) < 0) {
+                            errors.push(`${toolName} #${i + 1}: Cycles must be a valid number.`);
+                            continue;
+                        }
+                    }
+
+                    tools.push({
+                        code: toolCode,
+                        name: toolName,
+                        serial: serial,
+                        cycles: needCycles ? cycles : ''
+                    });
+                }
+
+                if (errors.length > 0) {
+                    hasError = true;
+                    errorBox.textContent = errors.join('\n');
+                    errorBox.classList.remove('d-none');
+                }
+            }
+        } else {
+            const check = item.querySelector('.tool-check');
+            if (check && check.checked) {
+                const serialInput = item.querySelector('.serial-input');
+                const cyclesInput = item.querySelector('.cycles-input');
+
+                const serial = serialInput ? serialInput.value.trim() : '';
+                const cycles = cyclesInput ? cyclesInput.value.trim() : '';
+                let errors = [];
+
+                if (!serial) {
+                    errors.push("Serial number is required.");
+                } else if (!serial.toUpperCase().startsWith('EBCJV')) {
+                    errors.push("Serial number must start with EBCJV.");
+                }
+
+                if (needCycles) {
+                    if (!cycles) {
+                        errors.push("Number of cycles is required.");
+                    } else if (isNaN(cycles) || Number(cycles) < 0) {
+                        errors.push("Cycles must be a valid number.");
+                    }
+                }
+
+                if (errors.length > 0) {
+                    hasError = true;
+                    errorBox.textContent = errors.join(' ');
+                    errorBox.classList.remove('d-none');
+                } else {
+                    tools.push({
+                        code: toolCode,
+                        name: toolName,
+                        serial: serial,
+                        cycles: needCycles ? cycles : ''
+                    });
+                }
             }
         }
-
-        if (errors.length > 0) {
-            hasError = true;
-            errorBox.textContent = errors.join(' ');
-            errorBox.classList.remove('d-none');
-            return;
-        }
-
-        tools.push({
-            code: check.value,
-            name: check.dataset.name,
-            serial: serial,
-            cycles: cycles
-        });
     });
 
-    if (hasError) {
-        alert("Please correct the highlighted tool details before submitting.");
+    if (tools.length === 0) {
+        alert("Please add at least one tool.");
         return;
     }
 
-    const tools_list = tools.map(t =>
-        `${t.code} – ${t.name}
+    if (hasError) {
+        alert("Please correct the highlighted fields before submitting.");
+        return;
+    }
+
+    const submittedAt = new Date().toLocaleString();
+
+    const toolsText = tools.map((t, i) =>
+`${i + 1}. ${t.code} – ${t.name}
 Serial: ${t.serial}${t.cycles ? ` | Cycles: ${t.cycles}` : ''}`
-    ).join("\n\n");
+    ).join('\n\n');
+
+    const toolsRowsHtml = tools.map((t, i) => `
+        <tr>
+            <td style="padding:10px; border:1px solid #ddd;">${i + 1}</td>
+            <td style="padding:10px; border:1px solid #ddd;">${escapeHtml(t.code)}</td>
+            <td style="padding:10px; border:1px solid #ddd;">${escapeHtml(t.name)}</td>
+            <td style="padding:10px; border:1px solid #ddd;">${escapeHtml(t.serial)}</td>
+            <td style="padding:10px; border:1px solid #ddd;">${t.cycles ? escapeHtml(t.cycles) : '-'}</td>
+        </tr>
+    `).join('');
+
+    const email_html = `
+        <div style="font-family: Arial, sans-serif; color:#222; line-height:1.5;">
+            <h2 style="margin-bottom:10px;">New Tool Kit Inspection Report</h2>
+
+            <table style="border-collapse:collapse; width:100%; margin-bottom:20px;">
+                <tr>
+                    <td style="padding:8px; border:1px solid #ddd; font-weight:bold; width:180px;">Technician</td>
+                    <td style="padding:8px; border:1px solid #ddd;">${escapeHtml(tech)}</td>
+                </tr>
+                <tr>
+                    <td style="padding:8px; border:1px solid #ddd; font-weight:bold;">Inspection Date</td>
+                    <td style="padding:8px; border:1px solid #ddd;">${escapeHtml(date)}</td>
+                </tr>
+                <tr>
+                    <td style="padding:8px; border:1px solid #ddd; font-weight:bold;">Kit Type</td>
+                    <td style="padding:8px; border:1px solid #ddd;">${escapeHtml(kit)}</td>
+                </tr>
+                <tr>
+                    <td style="padding:8px; border:1px solid #ddd; font-weight:bold;">Notes / Issues</td>
+                    <td style="padding:8px; border:1px solid #ddd;">${escapeHtml(notes)}</td>
+                </tr>
+                <tr>
+                    <td style="padding:8px; border:1px solid #ddd; font-weight:bold;">Submitted At</td>
+                    <td style="padding:8px; border:1px solid #ddd;">${escapeHtml(submittedAt)}</td>
+                </tr>
+            </table>
+
+            <h3 style="margin-bottom:10px;">Tools Inspected</h3>
+
+            <table style="border-collapse:collapse; width:100%;">
+                <thead>
+                    <tr>
+                        <th style="padding:10px; border:1px solid #ddd; background:#f2f2f2;">#</th>
+                        <th style="padding:10px; border:1px solid #ddd; background:#f2f2f2;">Code</th>
+                        <th style="padding:10px; border:1px solid #ddd; background:#f2f2f2;">Tool</th>
+                        <th style="padding:10px; border:1px solid #ddd; background:#f2f2f2;">Serial Number</th>
+                        <th style="padding:10px; border:1px solid #ddd; background:#f2f2f2;">Cycles</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${toolsRowsHtml}
+                </tbody>
+            </table>
+        </div>
+    `;
 
     const params = {
         technician: tech,
         date: date,
         kit: kit,
         notes: notes,
-        timestamp: new Date().toLocaleString(),
-        tools_list: tools_list
+        submitted_at: submittedAt,
+        tools_list: toolsText,
+        email_html: email_html
     };
 
     emailjs.send("service_hcolg8r", "template_gjz0o6c", params)
