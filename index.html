@@ -4,194 +4,626 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tool Kit Inspection Form</title>
+
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+
+    <!-- SheetJS browser build -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+
     <style>
-        body { background-color: #f8f9fa; padding: 30px 15px; }
-        .form-container { max-width: 950px; margin: auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
-        h1 { color: #0d6efd; }
-        .tool-item { border: 1px solid #dee2e6; border-radius: 8px; padding: 15px; margin-bottom: 12px; background: #fff; }
-        .tool-details { display: none; margin-top: 10px; padding-top: 10px; border-top: 1px solid #eee; }
-        .tool-details.show { display: block; }
+        body {
+            background-color: #f8f9fa;
+            padding: 30px 15px;
+        }
+
+        .form-container {
+            max-width: 1000px;
+            margin: auto;
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+
+        .tool-item {
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 12px;
+            background: #fff;
+        }
+
+        .tool-details {
+            display: none;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px dashed #dee2e6;
+        }
+
+        .tool-details.show {
+            display: block;
+        }
+
+        .repeat-serial-row {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            padding: 10px;
+            margin-top: 8px;
+        }
+
+        .required-note {
+            font-size: 0.92rem;
+            color: #6c757d;
+        }
+
+        .error-text {
+            color: #dc3545;
+            font-size: 0.875rem;
+            margin-top: 8px;
+            white-space: pre-line;
+        }
+
+        .tool-code {
+            color: #6c757d;
+            font-size: 0.95rem;
+        }
+
+        .qty-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            justify-content: flex-start;
+        }
+
+        .qty-btn {
+            width: 40px;
+            height: 40px;
+            border: none;
+            border-radius: 8px;
+            background: #0d6efd;
+            color: white;
+            font-size: 22px;
+            line-height: 1;
+            cursor: pointer;
+        }
+
+        .qty-btn:disabled {
+            background: #adb5bd;
+            cursor: not-allowed;
+        }
+
+        .qty-display {
+            min-width: 40px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .max-note {
+            font-size: 0.85rem;
+            color: #6c757d;
+            margin-top: 6px;
+        }
     </style>
 </head>
+
 <body>
-    <div class="form-container">
-        <h1 class="text-center mb-4">🔧 Tool Kit Inspection</h1>
-        <p class="text-center text-muted mb-4">Select your kit, check present tools, enter serial (starts with EBCJV) + cycles where needed.</p>
+<div class="form-container">
+    <h1 class="text-center mb-4">🔧 Tool Kit Inspection</h1>
 
-        <form id="inspectionForm" novalidate>
-            <div class="row mb-4">
-                <div class="col-md-6">
-                    <label class="form-label fw-bold">Technician Name <span class="text-danger">*</span></label>
-                    <input type="text" class="form-control" id="techName" placeholder="Your full name">
+    <form id="inspectionForm">
+
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <label class="form-label fw-bold">Technician Name *</label>
+                <input type="text" class="form-control" id="techName" required>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label fw-bold">Inspection Date</label>
+                <input type="date" class="form-control" id="inspectionDate" readonly>
+            </div>
+        </div>
+
+        <div class="mb-4">
+            <label class="form-label fw-bold">Kit Type *</label>
+            <select class="form-select" id="kitType" required>
+                <option value="">-- Select Kit --</option>
+                <option value="Kit A Nacelle Tools">Kit A Nacelle Tools</option>
+                <option value="Kit A Tower Tools">Kit A Tower Tools</option>
+                <option value="Kit B Nacelle Tools">Kit B Nacelle Tools</option>
+                <option value="Kit B Tower Tools">Kit B Tower Tools</option>
+            </select>
+        </div>
+
+        <h5>Tools Checklist</h5>
+        <p class="required-note mb-3">
+            Serial number must start with <strong>EBCJV</strong>.<br>
+            M42, M48, M56, M64 and M72 tools require cycles.<br>
+            Nacelle kits: ITH Pump, ITH Gauge, Hydraulic Hose max 2. M42 max 2.<br>
+            Tower kits: ITH Pump, ITH Gauge, Hydraulic Hose max 4.
+        </p>
+
+        <div id="toolsContainer"></div>
+
+        <div class="mb-4">
+            <label class="form-label fw-bold">Notes / Issues</label>
+            <textarea class="form-control" id="notes" rows="3"></textarea>
+        </div>
+
+        <button type="submit" class="btn btn-primary w-100">Submit & Email Excel</button>
+
+    </form>
+</div>
+
+<script>
+document.getElementById('inspectionDate').value = new Date().toISOString().split('T')[0];
+
+const towerTools = [
+    { code: "A9B10409967", name: "ITH PUMP" },
+    { code: "A9B10417874", name: "HYDRAULIC HOSE 20M" },
+    { code: "ITHGauge", name: "ITH Pressure Gauge" },
+    { code: "M48Bottom", name: "M48 Bottom" },
+    { code: "M48Top", name: "M48 Top" },
+    { code: "A9B10409963", name: "M56 Bottom" },
+    { code: "A9B10451309", name: "M56 Top" },
+    { code: "A9B10409964", name: "M64 Bottom" },
+    { code: "A9B10409283", name: "M64 Top" },
+    { code: "A9B10409965", name: "M72 Bottom" },
+    { code: "A9B10451311", name: "M72 Top" }
+];
+
+const nacelleTools = [
+    { code: "A9B10409967", name: "ITH PUMP 400V" },
+    { code: "ITHGauge", name: "ITH Pressure Gauge" },
+    { code: "A9B10417874", name: "HYDRAULIC HOSE 20M" },
+    { code: "A9BB0025812", name: "M42 Bottom" },
+    { code: "A9B10364804", name: "M42 Top" },
+    { code: "A9B10041792", name: "Plarad Hose Set 10m" },
+    { code: "A9B10042397", name: "Plarad Mxec95Ts" },
+    { code: "A9B10271779", name: "Plarad Hyde Pump" },
+    { code: "A9B00081024", name: "Plarad Pressure Gauge" }
+];
+
+const toolLists = {
+    "Kit A Tower Tools": towerTools,
+    "Kit B Tower Tools": towerTools,
+    "Kit A Nacelle Tools": nacelleTools,
+    "Kit B Nacelle Tools": nacelleTools
+};
+
+const kitSelect = document.getElementById('kitType');
+const container = document.getElementById('toolsContainer');
+
+function requiresCycles(toolName) {
+    return /M42|M48|M56|M64|M72/i.test(toolName);
+}
+
+function isTowerKit(kitName) {
+    return /Tower/i.test(kitName);
+}
+
+function isNacelleKit(kitName) {
+    return /Nacelle/i.test(kitName);
+}
+
+function isITHPump(toolName) {
+    return /ITH PUMP/i.test(toolName);
+}
+
+function isITHGauge(toolName) {
+    return /ITH Pressure Gauge/i.test(toolName);
+}
+
+function isHydraulicHose(toolCode, toolName) {
+    return toolCode === "A9B10417874" || /HYDRAULIC HOSE 20M/i.test(toolName);
+}
+
+function isM42(toolName) {
+    return /M42/i.test(toolName);
+}
+
+function getMaxQty(tool, kitName) {
+    if (isNacelleKit(kitName)) {
+        if (isITHPump(tool.name) || isITHGauge(tool.name) || isHydraulicHose(tool.code, tool.name)) {
+            return 2;
+        }
+        if (isM42(tool.name)) {
+            return 2;
+        }
+    }
+
+    if (isTowerKit(kitName)) {
+        if (isITHPump(tool.name) || isITHGauge(tool.name) || isHydraulicHose(tool.code, tool.name)) {
+            return 4;
+        }
+    }
+
+    return 1;
+}
+
+function makeSafeId(text) {
+    return text.replace(/[^a-zA-Z0-9_-]/g, '_');
+}
+
+function updateQtyControls(toolItem, qty, maxQty) {
+    const minusBtn = toolItem.querySelector('.minus-btn');
+    const plusBtn = toolItem.querySelector('.plus-btn');
+    const qtyDisplay = toolItem.querySelector('.qty-display');
+    const details = toolItem.querySelector('.tool-details');
+
+    qtyDisplay.textContent = qty;
+    minusBtn.disabled = qty <= 0;
+    plusBtn.disabled = qty >= maxQty;
+    details.classList.toggle('show', qty > 0);
+}
+
+function renderRepeatableInputs(toolItem, qty, tool, needCycles) {
+    const wrapper = toolItem.querySelector('.repeatable-inputs');
+    wrapper.innerHTML = '';
+
+    for (let i = 1; i <= qty; i++) {
+        const row = document.createElement('div');
+        row.className = 'repeat-serial-row';
+        row.innerHTML = `
+            <div class="mb-2">
+                <label class="form-label fw-semibold">${tool.name} #${i} Serial Number *</label>
+                <input type="text" class="form-control repeat-serial-input" data-index="${i}" placeholder="Must start with EBCJV">
+            </div>
+            ${needCycles ? `
+                <div>
+                    <label class="form-label fw-semibold">${tool.name} #${i} Cycles *</label>
+                    <input type="number" min="0" class="form-control repeat-cycles-input" data-index="${i}" placeholder="Number of Cycles">
                 </div>
-                <div class="col-md-6">
-                    <label class="form-label fw-bold">Inspection Date</label>
-                    <input type="date" class="form-control" id="inspectionDate" readonly>
+            ` : ''}
+        `;
+        wrapper.appendChild(row);
+    }
+}
+
+function createRepeatableTool(tool, kitName) {
+    const maxQty = getMaxQty(tool, kitName);
+    const needCycles = requiresCycles(tool.name);
+    const div = document.createElement('div');
+    div.className = 'tool-item';
+    div.dataset.code = tool.code;
+    div.dataset.name = tool.name;
+    div.dataset.repeatable = 'true';
+    div.dataset.maxQty = maxQty;
+    div.dataset.cycles = needCycles ? 'true' : 'false';
+    div.dataset.qty = '0';
+
+    div.innerHTML = `
+        <div class="row align-items-center g-3">
+            <div class="col-md-7">
+                <div class="fw-semibold">${tool.name}</div>
+                <div class="tool-code">${tool.code}</div>
+            </div>
+            <div class="col-md-5">
+                <label class="form-label fw-bold">Quantity</label>
+                <div class="qty-control">
+                    <button type="button" class="qty-btn minus-btn">−</button>
+                    <div class="qty-display">0</div>
+                    <button type="button" class="qty-btn plus-btn">+</button>
                 </div>
+                <div class="max-note">Maximum: ${maxQty}</div>
             </div>
+        </div>
 
-            <div class="mb-4">
-                <label class="form-label fw-bold">Kit Type <span class="text-danger">*</span></label>
-                <select class="form-select" id="kitType">
-                    <option value="">-- Select Kit --</option>
-                    <option value="A Nacelle">Kit A Nacelle Tools</option>
-                    <option value="A Tower">Kit A Tower Tools</option>
-                    <option value="B Nacelle">Kit B Nacelle Tools</option>
-                    <option value="B Tower">Kit B Tower Tools</option>
-                </select>
-            </div>
+        <div class="tool-details">
+            <div class="repeatable-inputs"></div>
+            <div class="error-text d-none"></div>
+        </div>
+    `;
 
-            <h5 class="mt-5 mb-3">Tools Checklist</h5>
-            <p class="text-muted small mb-4">Check each tool present. Serial required for all; cycles only for M42/M48/M56/M64/M72.</p>
+    const minusBtn = div.querySelector('.minus-btn');
+    const plusBtn = div.querySelector('.plus-btn');
 
-            <div id="toolsContainer" class="mb-4"></div>
+    minusBtn.addEventListener('click', () => {
+        let qty = Number(div.dataset.qty) || 0;
+        if (qty > 0) {
+            qty--;
+            div.dataset.qty = qty;
+            updateQtyControls(div, qty, maxQty);
+            renderRepeatableInputs(div, qty, tool, needCycles);
+        }
+    });
 
-            <div class="mb-4">
-                <label class="form-label fw-bold">Notes / Issues / Missing Tools</label>
-                <textarea class="form-control" id="notes" rows="3" placeholder="Any damage, missing items, or comments..."></textarea>
-            </div>
+    plusBtn.addEventListener('click', () => {
+        let qty = Number(div.dataset.qty) || 0;
+        if (qty < maxQty) {
+            qty++;
+            div.dataset.qty = qty;
+            updateQtyControls(div, qty, maxQty);
+            renderRepeatableInputs(div, qty, tool, needCycles);
+        }
+    });
 
-            <button type="submit" class="btn btn-primary btn-lg w-100">Submit & Email Report</button>
-        </form>
-    </div>
+    updateQtyControls(div, 0, maxQty);
+    return div;
+}
 
-    <script>
-        // Auto-fill today's date
-        document.getElementById('inspectionDate').value = new Date().toISOString().split('T')[0];
+function createSingleTool(tool) {
+    const needCycles = requiresCycles(tool.name);
+    const uniqueId = `tool_${makeSafeId(tool.code)}_${makeSafeId(tool.name)}`;
+    const div = document.createElement('div');
+    div.className = 'tool-item';
+    div.dataset.code = tool.code;
+    div.dataset.name = tool.name;
+    div.dataset.repeatable = 'false';
+    div.dataset.cycles = needCycles ? 'true' : 'false';
 
-        const toolLists = {
-            "A Nacelle": [
-                { code: "A9B10409967", name: "ITH PUMP 400V" },
-                { code: "ITHGauge", name: "ITH Pressure Gauge" },
-                { code: "A9B10417874", name: "HYDRAULIC HOSE 20M" },
-                { code: "A9BB0025812", name: "M42 Bottom" },
-                { code: "A9B10364804", name: "M42 Top" },
-                { code: "A9B10041792", name: "Plarad Hose Set 10m" },
-                { code: "A9B10042397", name: "Plarad Mxec95Ts" },
-                { code: "A9B10271779", name: "Plarad Hyde Pump" },
-                { code: "A9B00081024", name: "Plarad Pressure Gauge" }
-            ],
-            "A Tower": [
-                { code: "A9B10409967", name: "ITH PUMP" },
-                { code: "A9B10417874", name: "HYDRAULIC HOSE 20M" },
-                { code: "ITHGauge", name: "ITH Pressure Gauge" },
-                { code: "M48Bottom", name: "M48 Bottom" },
-                { code: "M48Top", name: "M48 Top" },
-                { code: "A9B10409963", name: "M56 Bottom" },
-                { code: "A9B10451309", name: "M56 Top" },
-                { code: "A9B10409964", name: "M64 Bottom" },
-                { code: "A9B10409283", name: "M64 Top" },
-                { code: "A9B10409965", name: "M72 Bottom" },
-                { code: "A9B10451311", name: "M72 Top" }
-            ],
-            "B Nacelle": [],
-            "B Tower": []
-        };
+    div.innerHTML = `
+        <div class="form-check">
+            <input
+                type="checkbox"
+                class="form-check-input tool-check"
+                id="${uniqueId}"
+                value="${tool.code}"
+                data-name="${tool.name}"
+            >
+            <label class="form-check-label fw-semibold" for="${uniqueId}">
+                ${tool.code} – ${tool.name}
+            </label>
+        </div>
 
-        toolLists["B Nacelle"] = toolLists["A Nacelle"];
-        toolLists["B Tower"] = toolLists["A Tower"];
+        <div class="tool-details">
+            <input class="form-control serial-input mt-2" placeholder="Serial Number (must start with EBCJV)">
+            ${needCycles ? `<input type="number" min="0" class="form-control cycles-input mt-2" placeholder="Number of Cycles">` : ''}
+            <div class="error-text d-none"></div>
+        </div>
+    `;
 
-        const kitSelect = document.getElementById('kitType');
-        const container = document.getElementById('toolsContainer');
+    const check = div.querySelector('.tool-check');
+    const details = div.querySelector('.tool-details');
 
-        kitSelect.addEventListener('change', () => {
-            const selected = kitSelect.value;
-            container.innerHTML = '';
+    check.addEventListener('change', () => {
+        details.classList.toggle('show', check.checked);
+    });
 
-            if (!selected || !toolLists[selected]) return;
+    return div;
+}
 
-            toolLists[selected].forEach(tool => {
-                const isTension = ["M42", "M48", "M56", "M64", "M72"].some(size => 
-                    tool.name.includes(size) || tool.code.includes(size)
-                );
+function renderTools() {
+    container.innerHTML = '';
+    const kitName = kitSelect.value;
+    const list = toolLists[kitName];
+    if (!list) return;
 
-                const div = document.createElement('div');
-                div.className = 'tool-item';
-                div.innerHTML = `
-                    <div class="form-check">
-                        <input class="form-check-input tool-check" type="checkbox" id="check-${tool.code}" value="${tool.code}" data-name="${tool.name}" data-istension="${isTension}">
-                        <label class="form-check-label fw-bold" for="check-${tool.code}">
-                            ${tool.code} – ${tool.name}
-                        </label>
-                    </div>
-                    <div class="tool-details" id="details-${tool.code}">
-                        <div class="row g-3">
-                            <div class="col-md-6">
-                                <label class="form-label">Serial Number <span class="text-danger">*</span> (starts with EBCJV)</label>
-                                <input type="text" class="form-control serial-input" placeholder="EBCJV123456">
-                            </div>
-                            ${isTension ? `
-                            <div class="col-md-6">
-                                <label class="form-label">Cycles Left <span class="text-danger">*</span></label>
-                                <input type="number" class="form-control cycles-input" min="0" placeholder="e.g. 450">
-                            </div>` : ''}
-                        </div>
-                    </div>
-                `;
+    list.forEach(tool => {
+        const maxQty = getMaxQty(tool, kitName);
+        if (maxQty > 1) {
+            container.appendChild(createRepeatableTool(tool, kitName));
+        } else {
+            container.appendChild(createSingleTool(tool));
+        }
+    });
+}
 
-                container.appendChild(div);
+kitSelect.addEventListener('change', renderTools);
 
-                const checkbox = div.querySelector('.tool-check');
-                const details = div.querySelector('.tool-details');
-                checkbox.addEventListener('change', () => {
-                    details.classList.toggle('show', checkbox.checked);
-                });
-            });
-        });
+// EmailJS init
+emailjs.init({
+    publicKey: "XO8aikuA7tN7m9laW"
+});
 
-        (function() {
-            emailjs.init({ publicKey: "XO8aikuA7tN7m9laW" });
-        })();
+function buildWorkbook(meta, tools) {
+    const summaryData = [
+        ["Field", "Value"],
+        ["Technician", meta.technician],
+        ["Inspection Date", meta.date],
+        ["Kit Type", meta.kit],
+        ["Notes / Issues", meta.notes],
+        ["Submitted At", meta.submittedAt],
+        ["Total Tools Recorded", tools.length]
+    ];
 
-        document.getElementById('inspectionForm').addEventListener('submit', function(e) {
-            e.preventDefault();
+    const toolsData = [
+        ["#", "Code", "Tool", "Serial Number", "Cycles"]
+    ];
 
-            const kit = kitSelect.options[kitSelect.selectedIndex].text;
-            const tech = document.getElementById('techName').value.trim();
-            const date = document.getElementById('inspectionDate').value;
-            const notes = document.getElementById('notes').value.trim();
+    tools.forEach((tool, index) => {
+        toolsData.push([
+            index + 1,
+            tool.code,
+            tool.name,
+            tool.serial,
+            tool.cycles || ""
+        ]);
+    });
 
-            const tools = [];
-            document.querySelectorAll('.tool-check:checked').forEach(check => {
-                const code = check.value;
-                const name = check.dataset.name;
-                const row = check.closest('.tool-item');
-                const serial = row.querySelector('.serial-input')?.value.trim() || '';
-                const cyclesEl = row.querySelector('.cycles-input');
-                const cycles = cyclesEl ? parseInt(cyclesEl.value) || null : null;
+    const wb = XLSX.utils.book_new();
 
-                if (serial) {
-                    tools.push({ code, name, serial, cycles });
+    const wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
+    const wsTools = XLSX.utils.aoa_to_sheet(toolsData);
+
+    wsSummary['!cols'] = [
+        { wch: 22 },
+        { wch: 45 }
+    ];
+
+    wsTools['!cols'] = [
+        { wch: 6 },
+        { wch: 18 },
+        { wch: 28 },
+        { wch: 22 },
+        { wch: 12 }
+    ];
+
+    XLSX.utils.book_append_sheet(wb, wsSummary, "Inspection Summary");
+    XLSX.utils.book_append_sheet(wb, wsTools, "Tools");
+
+    return wb;
+}
+
+document.getElementById('inspectionForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    const tech = document.getElementById('techName').value.trim();
+    const kit = kitSelect.value;
+    const date = document.getElementById('inspectionDate').value;
+    const notes = document.getElementById('notes').value.trim() || "None";
+
+    if (!tech || !kit) {
+        alert("Please fill in all required fields.");
+        return;
+    }
+
+    const tools = [];
+    let hasError = false;
+
+    document.querySelectorAll('.error-text').forEach(el => {
+        el.classList.add('d-none');
+        el.textContent = '';
+    });
+
+    document.querySelectorAll('.tool-item').forEach(item => {
+        const toolName = item.dataset.name;
+        const toolCode = item.dataset.code;
+        const repeatable = item.dataset.repeatable === 'true';
+        const needCycles = item.dataset.cycles === 'true';
+        const errorBox = item.querySelector('.error-text');
+
+        if (repeatable) {
+            const qty = Number(item.dataset.qty) || 0;
+
+            if (qty > 0) {
+                const serialInputs = item.querySelectorAll('.repeat-serial-input');
+                const cycleInputs = item.querySelectorAll('.repeat-cycles-input');
+                let errors = [];
+
+                for (let i = 0; i < qty; i++) {
+                    const serial = serialInputs[i] ? serialInputs[i].value.trim() : '';
+                    const cycles = needCycles && cycleInputs[i] ? cycleInputs[i].value.trim() : '';
+
+                    if (!serial) {
+                        errors.push(`${toolName} #${i + 1}: Serial number is required.`);
+                        continue;
+                    }
+
+                    if (!serial.toUpperCase().startsWith('EBCJV')) {
+                        errors.push(`${toolName} #${i + 1}: Serial must start with EBCJV.`);
+                        continue;
+                    }
+
+                    if (needCycles) {
+                        if (!cycles) {
+                            errors.push(`${toolName} #${i + 1}: Cycles are required.`);
+                            continue;
+                        }
+
+                        if (isNaN(cycles) || Number(cycles) < 0) {
+                            errors.push(`${toolName} #${i + 1}: Cycles must be a valid number.`);
+                            continue;
+                        }
+                    }
+
+                    tools.push({
+                        code: toolCode,
+                        name: toolName,
+                        serial: serial,
+                        cycles: needCycles ? cycles : ''
+                    });
                 }
-            });
 
-            if (tools.length === 0) {
-                alert("Please check at least one tool and enter its serial number.");
-                return;
+                if (errors.length > 0) {
+                    hasError = true;
+                    errorBox.textContent = errors.join('\n');
+                    errorBox.classList.remove('d-none');
+                }
             }
+        } else {
+            const check = item.querySelector('.tool-check');
+            if (check && check.checked) {
+                const serialInput = item.querySelector('.serial-input');
+                const cyclesInput = item.querySelector('.cycles-input');
 
-            const params = {
-                technician: tech,
-                date: date,
-                kit: kit,
-                notes: notes || "None",
-                timestamp: new Date().toISOString(),
-                tools: tools
-            };
+                const serial = serialInput ? serialInput.value.trim() : '';
+                const cycles = cyclesInput ? cyclesInput.value.trim() : '';
+                let errors = [];
 
-            emailjs.send("service_hcolg8r", "template_gjz0o6c", params)
-                .then(() => {
-                    alert(`Success! Inspection report sent to your inbox.\n\nTechnician: ${tech}\nKit: ${kit}\nTools checked: ${tools.length}`);
-                })
-                .catch(err => {
-                    console.error("EmailJS error:", err);
-                    alert("Failed to send report. Check internet or console (Develop > Show JavaScript Console) for details.");
-                });
+                if (!serial) {
+                    errors.push("Serial number is required.");
+                } else if (!serial.toUpperCase().startsWith('EBCJV')) {
+                    errors.push("Serial number must start with EBCJV.");
+                }
+
+                if (needCycles) {
+                    if (!cycles) {
+                        errors.push("Number of cycles is required.");
+                    } else if (isNaN(cycles) || Number(cycles) < 0) {
+                        errors.push("Cycles must be a valid number.");
+                    }
+                }
+
+                if (errors.length > 0) {
+                    hasError = true;
+                    errorBox.textContent = errors.join(' ');
+                    errorBox.classList.remove('d-none');
+                } else {
+                    tools.push({
+                        code: toolCode,
+                        name: toolName,
+                        serial: serial,
+                        cycles: needCycles ? cycles : ''
+                    });
+                }
+            }
+        }
+    });
+
+    if (tools.length === 0) {
+        alert("Please add at least one tool.");
+        return;
+    }
+
+    if (hasError) {
+        alert("Please correct the highlighted fields before submitting.");
+        return;
+    }
+
+    const submittedAt = new Date().toLocaleString();
+    const safeDate = date || new Date().toISOString().split('T')[0];
+    const inspectionFilename = `tool-kit-inspection-${safeDate}.xlsx`;
+
+    const workbook = buildWorkbook({
+        technician: tech,
+        date: date,
+        kit: kit,
+        notes: notes,
+        submittedAt: submittedAt
+    }, tools);
+
+    // Base64 XLSX for EmailJS variable attachment
+    const inspectionFileBase64 = XLSX.write(workbook, {
+        bookType: "xlsx",
+        type: "base64"
+    });
+
+    const params = {
+        technician: tech,
+        date: date,
+        kit: kit,
+        notes: notes,
+        submitted_at: submittedAt,
+        inspection_filename: inspectionFilename,
+        inspection_file: inspectionFileBase64
+    };
+
+    emailjs.send("service_hcolg8r", "template_gjz0o6c", params)
+        .then(() => {
+            alert("✅ Email with Excel attachment sent successfully");
+            document.getElementById('inspectionForm').reset();
+            document.getElementById('inspectionDate').value = new Date().toISOString().split('T')[0];
+            container.innerHTML = '';
+        })
+        .catch(err => {
+            console.error(err);
+            alert("❌ Failed to send email");
         });
-    </script>
+});
+</script>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
